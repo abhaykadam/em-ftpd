@@ -14,7 +14,7 @@ module EM::FTPD
     include Directories
     include Files
 
-    COMMANDS = %w[quit type user retr stor eprt port cdup cwd dele rmd pwd
+    COMMANDS = %w[auth quit type user retr stor eprt port cdup cwd dele rmd pwd
                   list size syst mkd pass xcup xpwd xcwd xrmd rest allo nlst
                   pasv epsv help noop mode rnfr rnto stru feat]
 
@@ -99,6 +99,9 @@ module EM::FTPD
         PassiveSocket.stop(@listen_sig)
         @listen_sig = nil
       end
+    end
+
+    def cmd_auth()
     end
 
     def cmd_allo(param)
