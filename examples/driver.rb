@@ -62,10 +62,10 @@ class Driver
 		files = tree.children.select(&:leaf?).collect(&:key)
 		list = []
 		directories.each { |dir|
-			list << dir_item(dir)
+			list << dir_item(dir.split('/').last)
 		}
 		files.each { |file|
-			list << file_item(file, bucket.objects[file].content_length)
+			list << file_item(file.split('/').last, bucket.objects[file].content_length)
 		}
 		
 		yield list
