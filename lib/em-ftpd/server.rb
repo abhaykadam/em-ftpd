@@ -108,11 +108,10 @@ module EM::FTPD
     def cmd_auth(param)
 	send_param_required and return if param.nil?
 	debugger
-	start_tls(:private_key_file => '/home/abhay/openssl/server.key', :cert_chain_file => '/home/abhay/openssl/server.crt', :verify_peer => true)
+	start_tls(:private_key_file => '/home/abhay/openssl/server.key', :cert_chain_file => '/home/abhay/openssl/server.crt', :verify_peer => false)
     end
 
     def ssl_handshake_completed
-	get_peer_cert
     	send_response "234 AUTH command OK"
     end
 

@@ -43,7 +43,11 @@ class Driver
 	# a boolen indicating if the current user is permitted to change to the
 	# requested path
 	def change_dir(path, &block)
-		yield true
+		if admin? || path.start_with?('/' + @user + '/')
+			yield true
+		else
+			yield false
+		end
 	end
 
 	# an array of the contents of the requested path or nil if the dir
@@ -52,31 +56,60 @@ class Driver
 	def dir_contents(path, &block)
 		s3 = AWS::S3.new
 		bucket, root = @aws_bucket.split("/")
-		puts bucket, root, path
 		bucket = s3.buckets[bucket]
-		tree = bucket.as_tree(:prefix => path)
+		tree = bucket.as_tree(:prefix => root+path)
 		directories = tree.children.select(&:branch?).collect(&:prefix)
+		files = tree.children.select(&:leaf?).collect(&:key)
 		list = []
 		directories.each { |dir|
 			list << dir_item(dir)
 		}
-		files = tree.children.select(&:leaf?).collect(&:key)
 		files.each { |file|
 			list << file_item(file, bucket.objects[file].content_length)
-			puts bucket.objects[file].content_length
 		}
 		
 		yield list
 	end
 
+	# a boolean indicating if the directory was successfully deleted
+	def delete_dir(path, &block)
+		path = path[1..-1] if path.start_with?("/")
+		s3 = AWS::S3.new
+		path = path + '/' unless path.end_with?('/')
+		bucket = s3.buckets[@aws_bucket + path]
+		yield bucket.delete.nil?
+	end
+
 	# a boolean indicating if path was successfully created as a new directory
-	def make_dir(path, &block)
+	def delete_file(path, &block)
+		path = path[1..-1] if path.start_with?("/")
 		s3 = AWS::S3.new
 		bucket = s3.buckets[@aws_bucket]
-		puts bucket.name
-		object = bucket.objects.create(path + '/test.txt', 'abhay')
+		object = bucket.objects[path]
+		yield object.delete.nil?
+	end
 
-		yield false
+	#na boolean indicating if from_path was successfully renamed to to_path
+	def rename(from_path, to_path, &block)
+		from_path = from_path[1..-1] if from_path.start_with?("/")
+		to_path = to_path[1..-1] if to_path.start_with?("/")		
+	
+		s3 = AWS::S3.new
+		bucket = s3.buckets[@aws_bucket]
+		old_obj = bucket.objects[from_path]
+		new_obj = old_obj.move_to(to_path)
+		yield new_obj.exists?
+	end
+
+	# a boolean indicating if path was successfully created as a new directory
+	def make_dir(path, &block)
+		path = path[1..-1] if path.start_with?('/')
+		path = path + '/' unless path.end_with?('/')
+		s3 = AWS::S3.new
+		bucket = s3.buckets[@aws_bucket]
+		object = bucket.objects.create(path, '')
+
+		yield object.exists?
 	end
 
 	def get_file(path, &block)
@@ -94,13 +127,6 @@ class Driver
 		tmpfile.seek(0)
 		yield tmpfile
 	end
-
-	# a boolean indicating if the directory was successfully deleted
-	#def delete_dir(path, &block)
-	#	s3 = AWS::S3.new
-	#	bucket = s3.buckets[@aws_bucket]
-	#	yield bucket.objects[path].delete == nil ? true : false 
-	#end
 
 	# an integer indicating the number of bytes received or False if there
 	# was an error
@@ -144,4 +170,9 @@ class Driver
 	def file_item(name, bytes)
 		EM::FTPD::DirectoryItem.new(:name => name, :directory => false, :size => bytes)
 	end
+
+	def admin?
+		@users[@user] && @users[@user][:admin]
+	end
+
 end
