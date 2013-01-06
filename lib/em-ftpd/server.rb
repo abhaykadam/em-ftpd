@@ -4,6 +4,9 @@ require 'stringio'
 require 'eventmachine'
 require 'em/protocols/line_protocol'
 
+require 'ruby-debug'
+Debugger .start
+
 module EM::FTPD
   class Server < EM::Connection
 
@@ -101,7 +104,16 @@ module EM::FTPD
       end
     end
 
-    def cmd_auth()
+    # Handle the AUTH FTP command
+    def cmd_auth(param)
+	send_param_required and return if param.nil?
+	debugger
+	start_tls(:private_key_file => '/home/abhay/openssl/server.key', :cert_chain_file => '/home/abhay/openssl/server.crt', :verify_peer => true)
+    end
+
+    def ssl_handshake_completed
+	get_peer_cert
+    	send_response "234 AUTH command OK"
     end
 
     def cmd_allo(param)
