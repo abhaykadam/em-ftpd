@@ -4,9 +4,6 @@ require 'stringio'
 require 'eventmachine'
 require 'em/protocols/line_protocol'
 
-require 'ruby-debug'
-Debugger .start
-
 module EM::FTPD
   class Server < EM::Connection
 

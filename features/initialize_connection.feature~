@@ -1,0 +1,7 @@
+Feature: ftp-server initialize connection
+	As a ftp-server
+	I want to accept connection requests from ftp-clients
+
+	Scenario: Initialize connection
+		
+		

@@ -71,12 +71,16 @@ module EM::FTPD
       param = '' if param.to_s == '-a'
 
       @driver.dir_contents(build_path(param)) do |files|
-        now = Time.now
-        lines = files.map { |item|
-          sizestr = (item.size || 0).to_s.rjust(12)
-          "#{item.directory ? 'd' : '-'}#{item.permissions || 'rwxrwxrwx'} 1 #{item.owner || 'owner'}  #{item.group || 'group'} #{sizestr} #{(item.time || now).strftime("%b %d %H:%M")} #{item.name}"
-        }
-        send_outofband_data(lines)
+	if files
+          now = Time.now
+          lines = files.map { |item|
+            sizestr = (item.size || 0).to_s.rjust(12)
+            "#{item.directory ? 'd' : '-'}#{item.permissions || 'rwxrwxrwx'} 1 #{item.owner || 'owner'}  #{item.group || 'group'} #{sizestr} #{(item.time || now).strftime("%b %d %H:%M")} #{item.name}"
+          }
+          send_outofband_data(lines)
+	else
+	  send_response "551 directory not available"
+	end
       end
     end
 

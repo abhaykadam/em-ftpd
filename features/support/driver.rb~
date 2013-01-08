@@ -1,6 +1,7 @@
 require 'aws-sdk'
 require 'csv'
 require 'tempfile'
+require 'em-ftpd'
 
 class Driver
 	def initialize (key, secret, bucket)
@@ -58,21 +59,16 @@ class Driver
 		s3 = AWS::S3.new
 		bucket, root = @aws_bucket.split("/")
 		bucket = s3.buckets[bucket]
-
-		dir = bucket.objects[root+path]
-		unless dir.exists?
-			yield nil
-		end
 				
 		tree = bucket.as_tree(:prefix => root+path)
 		directories = tree.children.select(&:branch?).collect(&:prefix)
 		files = tree.children.select(&:leaf?).collect(&:key)
 		list = []
 		directories.each { |dir|
-			list << EM::FTPD::DirectoryItem.new(:directory => true, :name => dir.split('/').last, :time =>bucket.objects[dir].last_modified, :size => 0)
+			list << dir_item(dir.split('/').last)
 		}
 		files.each { |file|
-			list << EM::FTPD::DirectoryItem.new(:directory => false, :name => file.split('/').last, :time =>bucket.objects[file].last_modified, :size => bucket.objects[file].content_length)
+			list << file_item(file.split('/').last, bucket.objects[file].content_length)
 		}
 		
 		yield list
@@ -121,7 +117,7 @@ class Driver
 		end
 	end
 
-	# a boolean indicating if path was successfully created as a new directory	
+	# a boolean indicating if path was successfully created as a new directory
 	def make_dir(path, &block)
 		path = path[1..-1] if path.start_with?('/')
 		path = path + '/' unless path.end_with?('/')
@@ -190,8 +186,20 @@ class Driver
 		users
 	end
 
+	def dir_item(name)
+		EM::FTPD::DirectoryItem.new(:name => name, :directory => true, :size => 0)
+	end
+
+	def file_item(name, bytes)
+		EM::FTPD::DirectoryItem.new(:name => name, :directory => false, :size => bytes)
+	end
+
 	def admin?
 		@users[@user] && @users[@user][:admin]
 	end
 
 end
+
+
+driver      Driver
+driver_args AWS_KEY, AWS_SECRET, AWS_BUCKET
