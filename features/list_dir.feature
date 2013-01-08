@@ -1,11 +1,15 @@
 @announce
+@listing
 Feature: List a Directory
 
 	Scenario: List a available directory
-		Given a ftp-client starts and connects with server
-		And I have logged in typing "USER test1" followed by "PASS 1234"
-		When I enter the LIST command "LIST test_ls"
-		Then the server responds with:
+		When I run `telnet localhost 21` interactively
+		And I type "USER test1"
+		Then I wait for response as "331 OK, password required"
+		When I type "PASS 1234"
+		Then I wait for response as "230 OK, password correct"
+		When I type "LIST test_ls"
+		Then the output should contain:
 			"""
 			150 Opening ASCII mode data connection for file list
 drwxrwxrwx 1 owner  group            0 Jan 08 12:51 x_dir
@@ -16,10 +20,13 @@ drwxrwxrwx 1 owner  group            0 Jan 08 12:51 x_dir
 			"""
 
 	Scenario: Listing a non-available directory
-		Given a ftp-client starts and connects with server
-		And I have logged in typing "USER test1" followed by "PASS 1234"
-		When I enter the LIST command "LIST not_avail"
-		Then the server responds with:
+		When I run `telnet localhost 21` interactively
+		And I type "USER test1"
+		Then I wait for response as "331 OK, password required"
+		When I type "PASS 1234"
+		Then I wait for response as "230 OK, password correct"
+		When I type "LIST not_avail"
+		Then the output should contain:
 			"""
 			227 Entering Passive Mode (127,0,0,1,183,59)
 150 Opening ASCII mode data connection for file list
