@@ -54,16 +54,18 @@ class Driver
 	def dir_contents(path, &block)
 		path = path + '/' unless path.end_with?('/')
 		bucket_path, root = @aws_bucket.split("/")
+
 		tree = bucket(bucket_path).as_tree(:prefix => root+path)
 		directories = tree.children.select(&:branch?).collect(&:prefix)
 		files = tree.children.select(&:leaf?).collect(&:key)
+
 		list = []
 		directories.each { |dir|
-			list << EM::FTPD::DirectoryItem.new(:directory => true, :name => dir.split('/').last, :time =>bucket.objects[dir].last_modified, :size => 0)
+			list << EM::FTPD::DirectoryItem.new(:directory => true, :name => dir.split('/').last, :time =>bucket(bucket_path).objects[dir].last_modified, :size => 0)
 		}
 		files.each { |file|
 			unless (file == root+path)
-				list << EM::FTPD::DirectoryItem.new(:directory => false, :name => file.split('/').last, :time =>bucket.objects[file].last_modified, :size => bucket.objects[file].content_length)
+				list << EM::FTPD::DirectoryItem.new(:directory => false, :name => file.split('/').last, :time =>bucket(bucket_path).objects[file].last_modified, :size => bucket(bucket_path).objects[file].content_length)
 			end
 		}
 		
@@ -99,8 +101,8 @@ class Driver
 
 	#na boolean indicating if from_path was successfully renamed to to_path
 	def rename(from_path, to_path, &block)
-		path = lstrip_slash(path)
-		to_path = to_path[1..-1] if to_path.start_with?("/")		
+		from_path = lstrip_slash(from_path)
+		to_path = lstrip_slash(to_path)		
 
 		old_obj = bucket.objects[from_path]
 		unless old_obj.exists?
