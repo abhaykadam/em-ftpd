@@ -28,11 +28,8 @@ class Driver
 	# an integer with the number of bytes in the file or nil if the file
 	# doesn't exist
 	def bytes(path, &block)
-		path = path[1..-1] if path.start_with?("/")
+		path = lstrip_slash(path)
 
-		s3 = AWS::S3.new
-		bucket = s3.buckets[@aws_bucket]
-		
 		if bucket.objects[path].exists?
 			yield bucket.objects[path].content_length
 		else
@@ -55,16 +52,9 @@ class Driver
 	# doesn't exist. Each entry in the array should be
 	# EM::FTPD::DirectoryItem-ish
 	def dir_contents(path, &block)
-		s3 = AWS::S3.new
-		bucket, root = @aws_bucket.split("/")
-		bucket = s3.buckets[bucket]
-
-		dir = bucket.objects[root+path]
-		unless dir.exists?
-			yield nil
-		end
-				
-		tree = bucket.as_tree(:prefix => root+path)
+		path = path + '/' unless path.end_with?('/')
+		bucket_path, root = @aws_bucket.split("/")
+		tree = bucket(bucket_path).as_tree(:prefix => root+path)
 		directories = tree.children.select(&:branch?).collect(&:prefix)
 		files = tree.children.select(&:leaf?).collect(&:key)
 		list = []
@@ -72,19 +62,22 @@ class Driver
 			list << EM::FTPD::DirectoryItem.new(:directory => true, :name => dir.split('/').last, :time =>bucket.objects[dir].last_modified, :size => 0)
 		}
 		files.each { |file|
-			list << EM::FTPD::DirectoryItem.new(:directory => false, :name => file.split('/').last, :time =>bucket.objects[file].last_modified, :size => bucket.objects[file].content_length)
+			unless (file == root+path)
+				list << EM::FTPD::DirectoryItem.new(:directory => false, :name => file.split('/').last, :time =>bucket.objects[file].last_modified, :size => bucket.objects[file].content_length)
+			end
 		}
 		
 		yield list
+		
 	end
 
 	# a boolean indicating if the directory was successfully deleted
 	def delete_dir(path, &block)
+		path = lstrip_slash(path)
 		path = path + '/' unless path.end_with?('/')
 
-		s3 = AWS::S3.new
-		bucket = s3.buckets[@aws_bucket]
 		object = bucket.objects[path]
+		puts path, object.exists?
 		unless object.exists?
 			yield false
 		else		
@@ -94,9 +87,8 @@ class Driver
 
 	# a boolean indicating if path was successfully created as a new directory
 	def delete_file(path, &block)
-		path = path[1..-1] if path.start_with?("/")
-		s3 = AWS::S3.new
-		bucket = s3.buckets[@aws_bucket]
+		path = lstrip_slash(path)
+
 		object = bucket.objects[path]
 		unless object.exists?
 			yield false
@@ -107,11 +99,9 @@ class Driver
 
 	#na boolean indicating if from_path was successfully renamed to to_path
 	def rename(from_path, to_path, &block)
-		from_path = from_path[1..-1] if from_path.start_with?("/")
+		path = lstrip_slash(path)
 		to_path = to_path[1..-1] if to_path.start_with?("/")		
 
-		s3 = AWS::S3.new
-		bucket = s3.buckets[@aws_bucket]
 		old_obj = bucket.objects[from_path]
 		unless old_obj.exists?
 			yield false
@@ -123,18 +113,14 @@ class Driver
 
 	# a boolean indicating if path was successfully created as a new directory	
 	def make_dir(path, &block)
-		path = path[1..-1] if path.start_with?('/')
+		path = lstrip_slash(path)
 		path = path + '/' unless path.end_with?('/')
-		s3 = AWS::S3.new
-		bucket = s3.buckets[@aws_bucket]
 		object = bucket.objects.create(path, '')
 		yield object.exists?
 	end
 
 	def get_file(path, &block)
-		path = path[1..-1] if path.start_with?("/")
-		s3 = AWS::S3.new
-		bucket = s3.buckets[@aws_bucket]
+		path = lstrip_slash(path)
 		
 		unless bucket.exists? 
 			yield false
@@ -158,9 +144,7 @@ class Driver
 	# an integer indicating the number of bytes received or False if there
 	# was an error
 	def put_file_streamed(path, datasocket, &block)
-		path = path[1..-1] if path.start_with?("/")
-		s3 = AWS::S3.new
-		bucket = s3.buckets[@aws_bucket]
+		path = lstrip_slash(path)
 		object = bucket.objects.create(path, '')
 		datasocket.on_stream { |chunk|
 			object.write(chunk)	
@@ -171,9 +155,13 @@ class Driver
 
 	private
 
-	def get_passwd_file (&block)
+	def bucket(bucket_path=@aws_bucket)
 		s3 = AWS::S3.new
-		bucket = s3.buckets[@aws_bucket]
+		bucket = s3.buckets[bucket_path]
+		bucket
+	end
+
+	def get_passwd_file (&block)
 		passwd = bucket.objects['passwd']
 		yield passwd.read()
 	end
@@ -194,4 +182,7 @@ class Driver
 		@users[@user] && @users[@user][:admin]
 	end
 
+	def lstrip_slash(string)
+		string[1..-1] if string.start_with?("/")
+	end
 end

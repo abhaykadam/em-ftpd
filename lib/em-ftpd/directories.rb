@@ -78,8 +78,6 @@ module EM::FTPD
             "#{item.directory ? 'd' : '-'}#{item.permissions || 'rwxrwxrwx'} 1 #{item.owner || 'owner'}  #{item.group || 'group'} #{sizestr} #{(item.time || now).strftime("%b %d %H:%M")} #{item.name}"
           }
           send_outofband_data(lines)
-	else
-	  send_response "551 directory not available"
 	end
       end
     end
