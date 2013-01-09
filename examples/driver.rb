@@ -7,7 +7,8 @@ class Driver
 		@aws_key, @aws_secret, @aws_bucket = key, secret, bucket
 		AWS.config(
 			:access_key_id => @aws_key, 
-			:secret_access_key => @aws_secret
+			:secret_access_key => @aws_secret,
+			:s3_multipart_min_part_size => 10
 		)		
 	end	
 	
@@ -147,12 +148,34 @@ class Driver
 	# was an error
 	def put_file_streamed(path, datasocket, &block)
 		path = lstrip_slash(path)
-		object = bucket.objects.create(path, '')
+		upload = bucket.objects[path].multipart_upload
+		id = upload.id
+		part_number = 1
+		@buffer = ""
 		datasocket.on_stream { |chunk|
-			object.write(chunk)	
+
+			@buffer << chunk
+			if @buffer.size > (5 * 1024 * 1024)
+				upload = bucket.objects[path].multipart_uploads[id]
+				upload.add_part(@buffer, :part_number => part_number)
+				part_number += 1
+				@buffer = ""
+			end
 		}
 
-		yield object.content_length
+		datasocket.callback {
+			upload = bucket.objects[path].multipart_uploads[id]
+			if @buffer.size != 0
+				upload = bucket.objects[path].multipart_uploads[id]
+				upload.add_part(@buffer, :part_number => part_number)
+				@buffer = ""
+			end
+			upload.complete(:remote_parts)
+			yield bucket.objects[path].content_length
+		}
+		datasocket.errback {
+          		yield false
+        	}
 	end
 
 	private
